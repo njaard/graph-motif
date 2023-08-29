@@ -20,7 +20,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 And then you can run this program with
 
-```cargo install https://github.com/njaard/graph-motif```
+```cargo install --git https://github.com/njaard/graph-motif```
 
 The program can then be run like so:
 
