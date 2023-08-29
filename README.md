@@ -34,8 +34,8 @@ each and every connection listed. The nodes are counted from 0.
 
 
 # Input file
-The input file must be a square matrix, with no headers. Each row
-represents the "from" node, and each column represents the "to" node.
+The input file must be a CSV file containing a directed square adjacency matrix, with no headers.
+Each row represents the "from" node, and each column represents the "to" node.
 
 For example, the following represents a graph where
 node '0' connects to node '1', which connects to node '2', and
