@@ -17,6 +17,9 @@ struct Args
 
 	#[arg(help="Output all the individual identified motifs", long="verbose")]
 	verbose: bool,
+
+	#[arg(help="Use the mean weight of each node's connections to determine its polarity, for networks that violate Dale's Law",long="dales-law-heuristic")]
+	dales_law_heuristic: bool,
 }
 
 fn main()
@@ -32,7 +35,7 @@ fn main()
 	{
 		let mut counters = [0; 12];
 
-		let nodes = load_nodes(csv_reader);
+		let nodes = load_nodes(csv_reader, args.dales_law_heuristic);
 
 		process(
 			&nodes,
@@ -59,7 +62,7 @@ fn main()
 	{
 		let mut counters = [0; 4];
 
-		let nodes = load_nodes(csv_reader);
+		let nodes = load_nodes(csv_reader, args.dales_law_heuristic);
 
 		process(
 			&nodes,
@@ -93,7 +96,7 @@ enum Type
 	Inhibitory,
 }
 
-#[derive(Default,Debug)]
+#[derive(Default,Debug,PartialEq,Eq)]
 struct Node
 {
 	edges_to: smallvec::SmallVec<[usize;4]>,
@@ -221,7 +224,7 @@ impl std::fmt::Display for MotifShape
 	}
 }
 
-fn load_nodes(mut csv_reader: csv::Reader<impl Read>) -> Vec<Node>
+fn load_nodes(mut csv_reader: csv::Reader<impl Read>, dales_law_heuristic: bool) -> Vec<Node>
 {
 	fn is_connected(s: &str) -> bool
 	{
@@ -229,8 +232,9 @@ fn load_nodes(mut csv_reader: csv::Reader<impl Read>) -> Vec<Node>
 		! (s == "0.0" || s == "0")
 	}
 
-
 	let mut nodes = Vec::new();
+
+	let mut sum_row_weight;
 
 	// load all the nodes and edges
 	let mut record = StringRecord::new();
@@ -247,6 +251,8 @@ fn load_nodes(mut csv_reader: csv::Reader<impl Read>) -> Vec<Node>
 			panic!("row {node_idx} doesn't have {} columns", nodes.len());
 		}
 
+		sum_row_weight=0.0;
+
 		for (col_idx,field) in record.iter().enumerate()
 		{
 			if is_connected(field)
@@ -254,20 +260,38 @@ fn load_nodes(mut csv_reader: csv::Reader<impl Read>) -> Vec<Node>
 				nodes[node_idx].edges_to.push(col_idx);
 				let Ok(s) = field.parse::<f64>() else {panic!("Can't parse node={node_idx} value=\"{field}\"") };
 
-				match (s.total_cmp(&0.0), nodes[node_idx].typ)
+				if dales_law_heuristic
 				{
-					(Ordering::Less, Type::Undetermined) => nodes[node_idx].typ = Type::Inhibitory,
-					(Ordering::Less, Type::Inhibitory) => {},
-					(Ordering::Less, Type::Excitatory) => panic!("node {node_idx} violating Dale's Law"),
-					(Ordering::Equal, _) => {},
-					(Ordering::Greater, Type::Undetermined) => nodes[node_idx].typ = Type::Excitatory,
-					(Ordering::Greater, Type::Excitatory) => {},
-					(Ordering::Greater, Type::Inhibitory) => panic!("node {node_idx} violating Dale's Law"),
+					sum_row_weight += s;
+				}
+				else
+				{
+					match (s.total_cmp(&0.0), nodes[node_idx].typ)
+					{
+						(Ordering::Less, Type::Undetermined) => nodes[node_idx].typ = Type::Inhibitory,
+						(Ordering::Less, Type::Inhibitory) => {},
+						(Ordering::Less, Type::Excitatory) => panic!("node {node_idx} violating Dale's Law"),
+						(Ordering::Equal, _) => {},
+						(Ordering::Greater, Type::Undetermined) => nodes[node_idx].typ = Type::Excitatory,
+						(Ordering::Greater, Type::Excitatory) => {},
+						(Ordering::Greater, Type::Inhibitory) => panic!("node {node_idx} violating Dale's Law"),
+					}
 				}
 
 				nodes[col_idx].edges_from.push(node_idx);
 			}
 		}
+
+		if dales_law_heuristic
+		{
+			nodes[node_idx].typ = match sum_row_weight.total_cmp(&0.0)
+			{
+				Ordering::Less => Type::Inhibitory,
+				Ordering::Greater => Type::Inhibitory,
+				Ordering::Equal => Type::Undetermined,
+			}
+		}
+
 		node_idx+=1;
 	}
 
@@ -346,6 +370,32 @@ mod tests
 	use super::{process,MotifShape,load_nodes};
 
 	#[test]
+	fn dales_law_heuristic()
+	{
+		let conn = "\
+0,0.9,-1.0
+0.1,0,-0.8
+0,0,0\
+		";
+		let csv_reader = ReaderBuilder::new()
+			.has_headers(false)
+			.from_reader(conn.as_bytes());
+
+		use super::{Node,Type::*};
+		use smallvec::smallvec;
+
+		assert_eq!(
+			load_nodes(csv_reader, true),
+			vec![
+				Node { edges_to: smallvec![1, 2], edges_from: smallvec![1], typ: Inhibitory },
+				Node { edges_to: smallvec![0, 2], edges_from: smallvec![0], typ: Inhibitory },
+				Node { edges_to: smallvec![], edges_from: smallvec![0, 1], typ: Undetermined }
+			]
+		);
+
+	}
+
+	#[test]
 	fn chain()
 	{
 		let conn = "\
@@ -358,7 +408,7 @@ mod tests
 			.from_reader(conn.as_bytes());
 
 		let mut out = vec![];
-		process(&load_nodes(csv_reader), |item| out.push(item));
+		process(&load_nodes(csv_reader, false), |item| out.push(item));
 		assert_eq!(out, vec![MotifShape::Chain(0,1,2)]);
 
 	}
@@ -375,7 +425,7 @@ mod tests
 			.from_reader(conn.as_bytes());
 
 		let mut out = vec![];
-		process(&load_nodes(csv_reader), |item| out.push(item));
+		process(&load_nodes(csv_reader, false), |item| out.push(item));
 		assert_eq!(out, vec![MotifShape::Divergent(1,0,2)]);
 	}
 	#[test]
@@ -391,7 +441,7 @@ mod tests
 			.from_reader(conn.as_bytes());
 
 		let mut out = vec![];
-		process(&load_nodes(csv_reader), |item| out.push(item));
+		process(&load_nodes(csv_reader, false), |item| out.push(item));
 		assert_eq!(out, vec![MotifShape::Convergent(1,0,2)]);
 	}
 	#[test]
@@ -406,7 +456,7 @@ mod tests
 			.from_reader(conn.as_bytes());
 
 		let mut out = vec![];
-		process(&load_nodes(csv_reader), |item| out.push(item));
+		process(&load_nodes(csv_reader, false), |item| out.push(item));
 
 		assert_eq!(out, vec![MotifShape::Reciprocal(0,1)]);
 	}

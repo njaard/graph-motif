@@ -54,7 +54,9 @@ and negative values represent inhibitory connections.
 
 Each row must contain connections of only the same sign, those that
 do not would violate [Dale's Law](https://en.wikipedia.org/wiki/Dale%27s_principle).
-This is a block-structured connectivity model.
+This is a block-structured connectivity model. If your network is known to violate
+Dale's Law, you can use the option `--dales-law-heuristic`, which takes the mean
+weight for each node's connections and uses that to compute its polarity.
 
 # Connection types
 The motifs counted are Chain, Divergent, Convergent, and Reciprocal. Only
