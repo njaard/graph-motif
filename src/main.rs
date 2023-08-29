@@ -213,7 +213,7 @@ impl std::fmt::Display for MotifShape
 			Self::Convergent(a,b,c) =>
 				write!(f, "convergent: {a} → {b} ← {c}"),
 			Self::Divergent(a,b,c) =>
-				write!(f, "divergent: {a} → {b} ← {c}"),
+				write!(f, "divergent: {a} ← {b} → {c}"),
 			Self::Reciprocal(a,b) =>
 				write!(f, "reciprocal: {a} ↔ {b}"),
 		}
