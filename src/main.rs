@@ -46,10 +46,11 @@ fn main()
 
 				if args.verbose
 				{
-					println!("{motif} ({cat:?})");
+					println!("{cat:?}: {motif}");
 				}
 			}
 		);
+		if args.verbose { println!(); }
 
 		for (idx,counter) in counters.iter().enumerate()
 		{
@@ -73,10 +74,11 @@ fn main()
 
 				if args.verbose
 				{
-					println!("{motif} ({cat:?})");
+					println!("{cat:?}: {motif}");
 				}
 			}
 		);
+		if args.verbose { println!(); }
 
 		for (idx,counter) in counters.iter().enumerate()
 		{
@@ -212,13 +214,13 @@ impl std::fmt::Display for MotifShape
 		match self
 		{
 			Self::Chain(a,b,c) =>
-				write!(f, "chain: {a} → {b} → {c}"),
+				write!(f, "{a} → {b} → {c}"),
 			Self::Convergent(a,b,c) =>
-				write!(f, "convergent: {a} → {b} ← {c}"),
+				write!(f, "{a} → {b} ← {c}"),
 			Self::Divergent(a,b,c) =>
-				write!(f, "divergent: {a} ← {b} → {c}"),
+				write!(f, "{a} ← {b} → {c}"),
 			Self::Reciprocal(a,b) =>
-				write!(f, "reciprocal: {a} ↔ {b}"),
+				write!(f, "{a} ↔ {b}"),
 		}
 
 	}
